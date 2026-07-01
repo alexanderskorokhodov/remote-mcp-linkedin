@@ -2,6 +2,7 @@
 
 from .schemas import (
     ALL_PROFILE_SECTIONS,
+    DEFAULT_NETWORK_DEGREES,
     DEFAULT_PROFILE_SECTIONS,
     PROTOCOL_VERSION,
     BridgeAck,
@@ -10,14 +11,18 @@ from .schemas import (
     BridgeHello,
     BridgeResultMessage,
     ErrorCode,
+    NetworkDegree,
+    NetworkSearchRequest,
     ProfileGetRequest,
     ProfileSection,
+    RawNetworkResult,
     RawProfileResult,
     SectionExtractionError,
 )
 
 __all__ = [
     "ALL_PROFILE_SECTIONS",
+    "DEFAULT_NETWORK_DEGREES",
     "DEFAULT_PROFILE_SECTIONS",
     "PROTOCOL_VERSION",
     "BridgeAck",
@@ -26,8 +31,11 @@ __all__ = [
     "BridgeHello",
     "BridgeResultMessage",
     "ErrorCode",
+    "NetworkDegree",
+    "NetworkSearchRequest",
     "ProfileGetRequest",
     "ProfileSection",
+    "RawNetworkResult",
     "RawProfileResult",
     "SectionExtractionError",
 ]

@@ -28,7 +28,12 @@ class ResultStore:
     def _save_sync(self, kind: str, payload: dict[str, Any]) -> Path:
         self.root.mkdir(parents=True, exist_ok=True)
         now = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        source = str(payload.get("profile_url") or payload.get("source_url") or kind)
+        source = str(
+            payload.get("profile_url")
+            or payload.get("search_url")
+            or payload.get("source_url")
+            or kind
+        )
         digest = hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
         path = self.root / f"{now}-{kind}-{digest}.json"
         path.write_text(
@@ -36,4 +41,3 @@ class ResultStore:
             encoding="utf-8",
         )
         return path
-

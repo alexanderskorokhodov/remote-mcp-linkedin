@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -25,6 +26,12 @@ class ProfileSection(StrEnum):
     POSTS = "posts"
 
 
+class NetworkDegree(StrEnum):
+    FIRST = "F"
+    SECOND = "S"
+    THIRD_PLUS = "O"
+
+
 DEFAULT_PROFILE_SECTIONS: tuple[ProfileSection, ...] = (
     ProfileSection.TOP_CARD,
     ProfileSection.ABOUT,
@@ -41,6 +48,8 @@ ALL_PROFILE_SECTIONS: tuple[ProfileSection, ...] = (
     *DEFAULT_PROFILE_SECTIONS,
     ProfileSection.POSTS,
 )
+
+DEFAULT_NETWORK_DEGREES: tuple[NetworkDegree, ...] = (NetworkDegree.FIRST,)
 
 
 class ErrorCode(StrEnum):
@@ -79,6 +88,12 @@ class ProfileGetRequest(BaseModel):
     username: str | None = None
     sections: list[ProfileSection] = Field(
         default_factory=lambda: list(DEFAULT_PROFILE_SECTIONS)
+    )
+    max_scrolls: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Maximum lazy-load scroll attempts for activity/posts pages.",
     )
 
     @field_validator("profile_url")
@@ -155,6 +170,101 @@ class ProfileGetRequest(BaseModel):
         return None
 
 
+class NetworkSearchRequest(BaseModel):
+    """Read-only request for visible LinkedIn people search/contact network data."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    keywords: str | None = None
+    location: str | None = None
+    network: list[NetworkDegree] = Field(
+        default_factory=lambda: list(DEFAULT_NETWORK_DEGREES)
+    )
+    current_company: str | None = None
+    max_pages: int = Field(default=1, ge=1, le=10)
+    max_scrolls: int = Field(default=5, ge=1, le=50)
+
+    @field_validator("keywords", "location", "current_company")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("network", mode="before")
+    @classmethod
+    def normalize_network(cls, value: Any) -> list[NetworkDegree]:
+        if value is None or value == "":
+            return list(DEFAULT_NETWORK_DEGREES)
+        if isinstance(value, str):
+            raw_degrees = [item.strip() for item in value.split(",")]
+        else:
+            raw_degrees = list(value)
+
+        aliases = {
+            "1": NetworkDegree.FIRST,
+            "1ST": NetworkDegree.FIRST,
+            "FIRST": NetworkDegree.FIRST,
+            "2": NetworkDegree.SECOND,
+            "2ND": NetworkDegree.SECOND,
+            "SECOND": NetworkDegree.SECOND,
+            "3": NetworkDegree.THIRD_PLUS,
+            "3RD": NetworkDegree.THIRD_PLUS,
+            "THIRD": NetworkDegree.THIRD_PLUS,
+            "OON": NetworkDegree.THIRD_PLUS,
+            "OUT": NetworkDegree.THIRD_PLUS,
+        }
+
+        degrees: list[NetworkDegree] = []
+        for raw in raw_degrees:
+            if isinstance(raw, NetworkDegree):
+                degree = raw
+            else:
+                token = str(raw).strip().upper()
+                degree = aliases.get(token) or NetworkDegree(token)
+            if degree not in degrees:
+                degrees.append(degree)
+        return degrees or list(DEFAULT_NETWORK_DEGREES)
+
+    @field_validator("current_company")
+    @classmethod
+    def validate_current_company(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.isdigit():
+            raise ValueError("current_company must be a numeric LinkedIn company URN")
+        return value
+
+    @property
+    def resolved_search_url(self) -> str:
+        params: list[tuple[str, str]] = []
+        if self.keywords:
+            params.append(("keywords", self.keywords))
+        if self.location:
+            params.append(("location", self.location))
+        if self.network:
+            params.append(
+                (
+                    "network",
+                    json.dumps(
+                        [degree.value for degree in self.network],
+                        separators=(",", ":"),
+                    ),
+                )
+            )
+        if self.current_company:
+            params.append(
+                (
+                    "currentCompany",
+                    json.dumps([self.current_company], separators=(",", ":")),
+                )
+            )
+        query = urlencode(params)
+        suffix = f"?{query}" if query else ""
+        return f"https://www.linkedin.com/search/results/people/{suffix}"
+
+
 class RawProfileResult(BaseModel):
     """Normalized raw profile extraction returned by the local bridge."""
 
@@ -166,6 +276,28 @@ class RawProfileResult(BaseModel):
     raw_sections: dict[ProfileSection, str] = Field(default_factory=dict)
     structured_sections: dict[str, Any] = Field(default_factory=dict)
     extraction_errors: list[SectionExtractionError] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    visible_only: bool = True
+    extractor: str = "unknown"
+    extracted_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC)
+    )
+
+
+class RawNetworkResult(BaseModel):
+    """Normalized raw network/contact search returned by the local bridge."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    search_url: str
+    keywords: str | None = None
+    location: str | None = None
+    network: list[NetworkDegree] = Field(default_factory=list)
+    current_company: str | None = None
+    profiles: list[dict[str, Any]] = Field(default_factory=list)
+    raw_text: str = ""
+    page_texts: list[str] = Field(default_factory=list)
+    references: list[dict[str, Any]] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     visible_only: bool = True
     extractor: str = "unknown"
@@ -198,8 +330,20 @@ class BridgeCommand(BaseModel):
     type: Literal["command"] = "command"
     protocol_version: Literal["0.1"] = PROTOCOL_VERSION
     command_id: str
-    command: Literal["profile.get"]
-    payload: ProfileGetRequest
+    command: Literal["profile.get", "network.search"]
+    payload: ProfileGetRequest | NetworkSearchRequest
+
+    @model_validator(mode="after")
+    def require_matching_payload(self) -> BridgeCommand:
+        if self.command == "profile.get" and not isinstance(
+            self.payload, ProfileGetRequest
+        ):
+            raise ValueError("profile.get requires ProfileGetRequest payload")
+        if self.command == "network.search" and not isinstance(
+            self.payload, NetworkSearchRequest
+        ):
+            raise ValueError("network.search requires NetworkSearchRequest payload")
+        return self
 
 
 class BridgeResultMessage(BaseModel):
@@ -209,7 +353,7 @@ class BridgeResultMessage(BaseModel):
     protocol_version: Literal["0.1"] = PROTOCOL_VERSION
     command_id: str
     status: Literal["ok", "error"]
-    payload: RawProfileResult | None = None
+    payload: RawProfileResult | RawNetworkResult | None = None
     error: BridgeError | None = None
 
     @model_validator(mode="after")
@@ -219,4 +363,3 @@ class BridgeResultMessage(BaseModel):
         if self.status == "error" and self.error is None:
             raise ValueError("error result requires error")
         return self
-

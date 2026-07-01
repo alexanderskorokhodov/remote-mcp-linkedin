@@ -23,7 +23,7 @@ connection to the server. It owns:
 - Local browser session access.
 - Read-only extraction commands.
 - Browser dependency isolation.
-- Returning raw normalized visible profile sections.
+- Returning raw normalized visible profile sections and contact-network results.
 
 The bridge performs no LLM reasoning and does not build dossiers.
 
@@ -35,6 +35,7 @@ The protocol package contains shared Pydantic schemas for:
 - Results.
 - Errors.
 - Raw profile extraction data.
+- Raw contact-network search data.
 
 All protocol messages include `protocol_version: "0.1"`.
 
@@ -56,6 +57,13 @@ sequenceDiagram
   B-->>S: result raw profile data
   S->>S: build deterministic dossier
   S-->>C: dossier JSON
+
+  C->>S: linkedin_contact_network_search(network=["F"])
+  S->>B: command network.search
+  B->>L: read visible people-search results
+  L-->>B: visible profiles/text
+  B-->>S: result raw network data
+  S-->>C: network JSON
 ```
 
 ## v0.1 Scope
@@ -80,4 +88,3 @@ The first version explicitly excludes:
 - Remote CDP exposure.
 - Arbitrary shell commands.
 - Server-side browser profile or cookie import.
-

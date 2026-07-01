@@ -25,6 +25,7 @@ from remote_mcp_linkedin_bridge.browser.session import (
     BrowserSessionConfig,
     create_profile_extractor,
 )
+from remote_mcp_linkedin_bridge.commands.network import handle_network_search
 from remote_mcp_linkedin_bridge.commands.profiles import handle_profile_get
 
 logger = logging.getLogger(__name__)
@@ -107,9 +108,12 @@ async def _handle_message(
     try:
         command = BridgeCommand.model_validate_json(raw_message)
         command_id = command.command_id
-        if command.command != "profile.get":
+        if command.command == "profile.get":
+            payload = await handle_profile_get(command, extractor)
+        elif command.command == "network.search":
+            payload = await handle_network_search(command, extractor)
+        else:
             raise UnsupportedCommand(command.command)
-        payload = await handle_profile_get(command, extractor)
         return BridgeResultMessage(
             command_id=command.command_id,
             status="ok",

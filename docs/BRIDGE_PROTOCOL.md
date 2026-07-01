@@ -43,7 +43,12 @@ The server replies:
 
 ## Commands
 
-v0.1 allows only `profile.get`:
+v0.1 allows these read-only commands:
+
+- `profile.get`
+- `network.search`
+
+### `profile.get`
 
 ```json
 {
@@ -54,7 +59,8 @@ v0.1 allows only `profile.get`:
   "payload": {
     "profile_url": "https://www.linkedin.com/in/example/",
     "username": null,
-    "sections": ["top_card", "about", "experience", "education", "skills"]
+    "sections": ["top_card", "about", "experience", "education", "skills"],
+    "max_scrolls": 10
   }
 }
 ```
@@ -74,9 +80,43 @@ Allowed sections:
 - `contact_info`
 - `posts`
 
+When `posts` is requested, the Patchright bridge reads the profile activity URL:
+
+```text
+https://www.linkedin.com/in/{username}/recent-activity/all/
+```
+
+### `network.search`
+
+```json
+{
+  "type": "command",
+  "protocol_version": "0.1",
+  "command_id": "uuid",
+  "command": "network.search",
+  "payload": {
+    "keywords": "senior engineer",
+    "location": "Remote",
+    "network": ["F"],
+    "current_company": null,
+    "max_pages": 1,
+    "max_scrolls": 5
+  }
+}
+```
+
+Allowed `network` values match LinkedIn's people-search facet:
+
+- `F`: 1st-degree contacts
+- `S`: 2nd-degree contacts
+- `O`: 3rd-degree and beyond
+
+If omitted, `network` defaults to `["F"]`. `current_company` must be the numeric
+LinkedIn company URN id used by the `currentCompany` people-search facet.
+
 ## Results
 
-Successful result:
+Successful `profile.get` result:
 
 ```json
 {
@@ -93,6 +133,48 @@ Successful result:
     },
     "structured_sections": {},
     "extraction_errors": [],
+    "warnings": [],
+    "visible_only": true,
+    "extractor": "patchright",
+    "extracted_at": "2026-07-01T00:00:00Z"
+  },
+  "error": null
+}
+```
+
+Successful `network.search` result:
+
+```json
+{
+  "type": "result",
+  "protocol_version": "0.1",
+  "command_id": "uuid",
+  "status": "ok",
+  "payload": {
+    "search_url": "https://www.linkedin.com/search/results/people/?network=%5B%22F%22%5D",
+    "keywords": null,
+    "location": null,
+    "network": ["F"],
+    "current_company": null,
+    "profiles": [
+      {
+        "username": "example",
+        "profile_url": "https://www.linkedin.com/in/example/",
+        "name": "Example Person",
+        "degree": "1st",
+        "raw": "Visible result card text"
+      }
+    ],
+    "raw_text": "Visible search result text",
+    "page_texts": ["Visible search result text"],
+    "references": [
+      {
+        "kind": "person",
+        "url": "/in/example/",
+        "text": "Example Person",
+        "context": "network_search"
+      }
+    ],
     "warnings": [],
     "visible_only": true,
     "extractor": "patchright",
@@ -129,4 +211,3 @@ Error result:
 - `invalid_request`
 - `protocol_error`
 - `unsupported_command`
-

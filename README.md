@@ -1,18 +1,23 @@
 # remote-mcp-linkedin
 
-Read-only MCP server for turning visible LinkedIn profile data into structured dossiers.
-It uses a local browser bridge, so the browser session stays on the user's machine.
+Read-only MCP server for collecting visible LinkedIn profile, post, and
+contact-network data and turning profile data into structured dossiers. It uses
+a local browser bridge, so the browser session stays on the user's machine.
 
 ## What it does
 
 - Opens visible LinkedIn profile pages through a local browser bridge
 - Extracts basic public / visible profile data
+- Collects visible profile posts from `/recent-activity/all/`
+- Searches visible people/contact-network results, defaulting to 1st-degree contacts
 - Builds a structured dossier for AI agents
 - Exposes the result through MCP tools
 
 ## MCP tools
 
 - `linkedin_profile_get` - returns normalized visible profile data
+- `linkedin_profile_posts` - returns visible posts from a profile activity page
+- `linkedin_contact_network_search` - returns visible people-search/contact results
 - `linkedin_profile_dossier` - returns a structured profile dossier with evidence, gaps, warnings, and confidence
 
 ## Safety
@@ -42,6 +47,8 @@ Working:
 - MCP server
 - local bridge
 - profile data tool
+- profile posts tool
+- contact network search tool
 - dossier tool
 - JSON result storage
 
@@ -54,4 +61,3 @@ Not ready:
 ## License
 
 MIT
-

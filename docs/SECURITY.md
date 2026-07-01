@@ -6,8 +6,8 @@ The local bridge is the only component allowed to touch a browser. Cookies,
 browser profiles, storage state, auth headers, browser fingerprint data, and
 session state must stay on the bridge machine.
 
-The server may store extracted profile/dossier JSON, but it must not receive or
-store browser authentication material.
+The server may store extracted profile, post, network, and dossier JSON, but it
+must not receive or store browser authentication material.
 
 ## Authentication
 
@@ -30,8 +30,12 @@ to loopback or put it behind a trusted authenticated gateway.
 
 ## Read-only Command Allowlist
 
-The bridge only accepts `profile.get` in v0.1. Unsupported commands are rejected
-with `unsupported_command`.
+The bridge only accepts read-only commands in v0.1:
+
+- `profile.get`
+- `network.search`
+
+Unsupported commands are rejected with `unsupported_command`.
 
 No write actions are implemented:
 
@@ -64,4 +68,3 @@ result storage access-controlled.
 - Extraction is limited to data visible to the logged-in local user.
 - DOM and text layout changes can break extraction.
 - The v0.1 Patchright extractor is experimental and partial.
-

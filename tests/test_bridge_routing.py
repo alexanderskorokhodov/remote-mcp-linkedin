@@ -7,8 +7,11 @@ from remote_mcp_linkedin_protocol import (
     BridgeCommand,
     BridgeHello,
     BridgeResultMessage,
+    NetworkDegree,
+    NetworkSearchRequest,
     ProfileGetRequest,
     ProfileSection,
+    RawNetworkResult,
     RawProfileResult,
 )
 from remote_mcp_linkedin_server.bridge.manager import (
@@ -71,3 +74,60 @@ async def test_server_to_bridge_profile_command_routing() -> None:
     finally:
         await manager.stop()
 
+
+async def test_server_to_bridge_network_command_routing() -> None:
+    manager = BridgeConnectionManager(
+        BridgeServerConfig(
+            token="test-token",
+            host="127.0.0.1",
+            port=0,
+            command_timeout_seconds=5,
+        )
+    )
+    await manager.start()
+
+    async def mocked_bridge() -> None:
+        async with connect(f"ws://127.0.0.1:{manager.port}/bridge") as websocket:
+            await websocket.send(
+                BridgeHello(token="test-token").model_dump_json()
+            )
+            ack = BridgeAck.model_validate_json(await websocket.recv())
+            assert ack.accepted is True
+
+            command = BridgeCommand.model_validate_json(await websocket.recv())
+            assert command.command == "network.search"
+            assert command.payload.network == [NetworkDegree.FIRST]
+
+            payload = RawNetworkResult(
+                search_url=command.payload.resolved_search_url,
+                network=command.payload.network,
+                profiles=[
+                    {
+                        "username": "jane-doe",
+                        "profile_url": "https://www.linkedin.com/in/jane-doe/",
+                    }
+                ],
+                extractor="mock",
+            )
+            await websocket.send(
+                BridgeResultMessage(
+                    command_id=command.command_id,
+                    status="ok",
+                    payload=payload,
+                ).model_dump_json()
+            )
+
+    task = asyncio.create_task(mocked_bridge())
+    try:
+        for _ in range(100):
+            if manager._session is not None:
+                break
+            await asyncio.sleep(0.01)
+
+        result = await manager.search_network(NetworkSearchRequest(network=["F"]))
+
+        assert result.network == [NetworkDegree.FIRST]
+        assert result.profiles[0]["username"] == "jane-doe"
+        await task
+    finally:
+        await manager.stop()

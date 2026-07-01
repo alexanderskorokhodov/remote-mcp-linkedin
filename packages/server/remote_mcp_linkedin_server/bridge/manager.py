@@ -17,7 +17,9 @@ from remote_mcp_linkedin_protocol import (
     BridgeHello,
     BridgeResultMessage,
     ErrorCode,
+    NetworkSearchRequest,
     ProfileGetRequest,
+    RawNetworkResult,
     RawProfileResult,
 )
 from remote_mcp_linkedin_protocol.schemas import BridgeError
@@ -83,7 +85,7 @@ class BridgeSession:
         command: BridgeCommand,
         *,
         timeout_seconds: float,
-    ) -> RawProfileResult:
+    ) -> RawProfileResult | RawNetworkResult:
         loop = asyncio.get_running_loop()
         future: asyncio.Future[BridgeResultMessage] = loop.create_future()
         self._pending[command.command_id] = future
@@ -204,10 +206,44 @@ class BridgeConnectionManager(BridgeClient):
             payload=request,
         )
         logger.info("Dispatching read-only bridge command profile.get")
-        return await session.send_command(
+        result = await session.send_command(
             command,
             timeout_seconds=self.config.command_timeout_seconds,
         )
+        if not isinstance(result, RawProfileResult):
+            raise BridgeCommandError(
+                BridgeError(
+                    code=ErrorCode.PROTOCOL_ERROR,
+                    message="Bridge returned non-profile payload for profile.get",
+                )
+            )
+        return result
+
+    async def search_network(
+        self, request: NetworkSearchRequest
+    ) -> RawNetworkResult:
+        session = self._session
+        if session is None:
+            raise BridgeUnavailableError("No authenticated local bridge is connected")
+
+        command = BridgeCommand(
+            command_id=str(uuid.uuid4()),
+            command="network.search",
+            payload=request,
+        )
+        logger.info("Dispatching read-only bridge command network.search")
+        result = await session.send_command(
+            command,
+            timeout_seconds=self.config.command_timeout_seconds,
+        )
+        if not isinstance(result, RawNetworkResult):
+            raise BridgeCommandError(
+                BridgeError(
+                    code=ErrorCode.PROTOCOL_ERROR,
+                    message="Bridge returned non-network payload for network.search",
+                )
+            )
+        return result
 
     async def _handle_socket(self, websocket: ServerConnection) -> None:
         path = self._get_path(websocket)
@@ -254,4 +290,3 @@ class BridgeConnectionManager(BridgeClient):
         if path is not None:
             return path
         return getattr(websocket, "path", None)
-
