@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Remote LinkedIn MCP server with a local read-only browser bridge."
 readme = "README.md"
 requires-python = ">=3.12"
-license = "Apache-2.0"
+license = "MIT"
 authors = [
     { name = "remote-mcp-linkedin contributors" }
 ]
@@ -41,9 +41,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/remote-mcp-linkedin/remote-mcp-linkedin"
-Repository = "https://github.com/remote-mcp-linkedin/remote-mcp-linkedin"
-Issues = "https://github.com/remote-mcp-linkedin/remote-mcp-linkedin/issues"
+Homepage = "https://github.com/alexanderskorokhodov/remote-mcp-linkedin"
+Repository = "https://github.com/alexanderskorokhodov/remote-mcp-linkedin"
+Issues = "https://github.com/alexanderskorokhodov/remote-mcp-linkedin/issues"
 
 [project.scripts]
 remote-mcp-linkedin-server = "remote_mcp_linkedin_server.main:main"

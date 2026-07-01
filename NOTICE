@@ -1,14 +1,4 @@
 remote-mcp-linkedin
 Copyright 2026 remote-mcp-linkedin contributors
 
-This project is licensed under the Apache License, Version 2.0.
-
-This project was designed with reference to the public project
-stickerdaniel/linkedin-mcp-server, which is licensed under the Apache License,
-Version 2.0:
-
-  https://github.com/stickerdaniel/linkedin-mcp-server
-
-The v0.1 implementation in this repository uses its own remote server /
-local bridge architecture and does not include write-action tools.
-
+This project is licensed under the MIT License.
